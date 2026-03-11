@@ -10,29 +10,34 @@ import (
 	"time"
 )
 
+// Runner executes shell commands and returns captured output.
 type Runner interface {
 	Run(ctx context.Context, request CommandRequest) (CommandResult, error)
 }
 
+// CommandRequest specifies a command to run: path, args, working directory, and output limit.
 type CommandRequest struct {
-	Path           string
-	Args           []string
-	Dir            string
-	MaxOutputBytes int
+	Path           string   // Executable path
+	Args           []string // Command-line arguments
+	Dir            string   // Working directory
+	MaxOutputBytes int     // Max bytes to capture from stdout/stderr
 }
 
+// CommandResult holds stdout, stderr, exit code, duration, and truncation flags.
 type CommandResult struct {
-	Command   []string
-	Stdout    string
-	Stderr    string
-	ExitCode  int
-	Duration  time.Duration
-	Truncated bool
-	TimedOut  bool
+	Command   []string        // Full command that was run
+	Stdout    string          // Captured stdout
+	Stderr    string          // Captured stderr
+	ExitCode  int             // Process exit code
+	Duration  time.Duration   // Elapsed time
+	Truncated bool            // True if output was truncated
+	TimedOut  bool            // True if command exceeded timeout
 }
 
+// RealRunner runs commands via os/exec and captures output.
 type RealRunner struct{}
 
+// Run executes the command and returns captured stdout, stderr, and exit code.
 func (RealRunner) Run(ctx context.Context, request CommandRequest) (CommandResult, error) {
 	command := exec.CommandContext(ctx, request.Path, request.Args...)
 	command.Dir = request.Dir

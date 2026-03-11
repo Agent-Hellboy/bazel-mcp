@@ -29,6 +29,7 @@ func (f *fakeRunner) Run(_ context.Context, request CommandRequest) (CommandResu
 	return result, f.err
 }
 
+// TestInitializeAndToolsList verifies server init and that all tools are registered.
 func TestInitializeAndToolsList(t *testing.T) {
 	server := newTestServer(&fakeRunner{})
 	session := newTestClientSession(t, server)
@@ -72,6 +73,7 @@ func TestInitializeAndToolsList(t *testing.T) {
 	}
 }
 
+// TestBazelBuildCallsRunnerWithTargetsAndFlags verifies bazel_build invokes the runner with correct args.
 func TestBazelBuildCallsRunnerWithTargetsAndFlags(t *testing.T) {
 	runner := &fakeRunner{
 		result: CommandResult{
@@ -119,6 +121,7 @@ func TestBazelBuildCallsRunnerWithTargetsAndFlags(t *testing.T) {
 	}
 }
 
+// TestBazelRunCallsRunnerWithTargetAndArgs verifies bazel_run passes target, flags, and -- args correctly.
 func TestBazelRunCallsRunnerWithTargetAndArgs(t *testing.T) {
 	runner := &fakeRunner{
 		result: CommandResult{
@@ -156,6 +159,7 @@ func TestBazelRunCallsRunnerWithTargetAndArgs(t *testing.T) {
 	}
 }
 
+// TestBazelTestFailureMarksToolResultAsError verifies failing tests set isError on the result.
 func TestBazelTestFailureMarksToolResultAsError(t *testing.T) {
 	runner := &fakeRunner{
 		result: CommandResult{
@@ -183,6 +187,7 @@ func TestBazelTestFailureMarksToolResultAsError(t *testing.T) {
 	}
 }
 
+// TestUnknownArgumentsReturnInvalidParams verifies unknown params return JSON-RPC invalid params.
 func TestUnknownArgumentsReturnInvalidParams(t *testing.T) {
 	server := newTestServer(&fakeRunner{})
 	session := newTestClientSession(t, server)
@@ -191,6 +196,31 @@ func TestUnknownArgumentsReturnInvalidParams(t *testing.T) {
 		Name: "bazel_query",
 		Arguments: map[string]any{
 			"expression": "//...",
+			"unexpected": true,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected invalid params error")
+	}
+
+	var rpcErr *jsonrpc.Error
+	if !errors.As(err, &rpcErr) {
+		t.Fatalf("expected JSON-RPC error, got %T: %v", err, err)
+	}
+	if rpcErr.Code != jsonrpc.CodeInvalidParams {
+		t.Fatalf("unexpected error code: got %d want %d", rpcErr.Code, jsonrpc.CodeInvalidParams)
+	}
+}
+
+// TestBazelRunUnknownArgumentsReturnInvalidParams verifies bazel_run unknown params return invalid params.
+func TestBazelRunUnknownArgumentsReturnInvalidParams(t *testing.T) {
+	server := newTestServer(&fakeRunner{})
+	session := newTestClientSession(t, server)
+
+	_, err := session.CallTool(context.Background(), &sdkmcp.CallToolParams{
+		Name: "bazel_run",
+		Arguments: map[string]any{
+			"target":     "//:run_me",
 			"unexpected": true,
 		},
 	})

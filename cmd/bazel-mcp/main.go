@@ -1,3 +1,5 @@
+// Command bazel-mcp is an MCP server that exposes Bazel tools (info, query, build, test, run)
+// over stdio for use by MCP clients such as Cursor or Claude Desktop.
 package main
 
 import (

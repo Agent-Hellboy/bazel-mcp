@@ -1,0 +1,4 @@
+module(
+    name = "bazel_mcp_e2e",
+    version = "0.0.1",
+)

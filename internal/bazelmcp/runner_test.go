@@ -2,6 +2,7 @@ package bazelmcp
 
 import "testing"
 
+// TestLimitedBufferConsumesFullWriteWhenTruncating verifies limitedBuffer honors Write contract when truncating.
 func TestLimitedBufferConsumesFullWriteWhenTruncating(t *testing.T) {
 	buffer := limitedBuffer{Limit: 4}
 

@@ -1,3 +1,5 @@
+// Package bazelmcp provides an MCP server that exposes Bazel workflows (info, query,
+// build, test, run) over the Model Context Protocol.
 package bazelmcp
 
 import (
@@ -21,16 +23,18 @@ const (
 	serverVersion = "0.1.0"
 )
 
+// Config holds server configuration for workspace, Bazel binary, and execution limits.
 type Config struct {
-	WorkspaceRoot  string
-	BazelBinary    string
-	StartupFlags   []string
-	CommonFlags    []string
-	DefaultTimeout time.Duration
-	MaxOutputBytes int
-	Logger         *slog.Logger
+	WorkspaceRoot  string        // Bazel workspace root for all commands
+	BazelBinary    string        // Path to bazel or bazelisk executable
+	StartupFlags   []string      // Flags passed before the command (e.g. --batch)
+	CommonFlags    []string      // Flags passed after the command name
+	DefaultTimeout time.Duration // Max time per Bazel invocation
+	MaxOutputBytes int           // Max stdout/stderr bytes captured before truncation
+	Logger         *slog.Logger  // Logger for server events
 }
 
+// Server is an MCP server that runs Bazel commands in a configured workspace.
 type Server struct {
 	cfg       Config
 	runner    Runner
@@ -42,6 +46,7 @@ type toolDefinition struct {
 	handle sdkmcp.ToolHandler
 }
 
+// New creates and configures a Server. If runner is nil, RealRunner is used.
 func New(cfg Config, runner Runner) *Server {
 	cfg = withDefaults(cfg)
 	if runner == nil {
@@ -87,10 +92,12 @@ func withDefaults(cfg Config) Config {
 	return cfg
 }
 
+// ServeStdio runs the server over stdin/stdout for MCP clients.
 func (s *Server) ServeStdio(ctx context.Context) error {
 	return s.Run(ctx, &sdkmcp.StdioTransport{})
 }
 
+// ServeIO runs the server over the given reader and writer (e.g., pipes or sockets).
 func (s *Server) ServeIO(ctx context.Context, reader io.ReadCloser, writer io.WriteCloser) error {
 	return s.Run(ctx, &sdkmcp.IOTransport{
 		Reader: reader,
@@ -98,10 +105,12 @@ func (s *Server) ServeIO(ctx context.Context, reader io.ReadCloser, writer io.Wr
 	})
 }
 
+// Run starts the server with the given transport.
 func (s *Server) Run(ctx context.Context, transport sdkmcp.Transport) error {
 	return s.mcpServer.Run(ctx, transport)
 }
 
+// Connect creates a server session for testing or custom transport handling.
 func (s *Server) Connect(ctx context.Context, transport sdkmcp.Transport, opts *sdkmcp.ServerSessionOptions) (*sdkmcp.ServerSession, error) {
 	return s.mcpServer.Connect(ctx, transport, opts)
 }
@@ -197,6 +206,22 @@ func (s *Server) registerTools() {
 			},
 			handle: s.handleBazelTest,
 		},
+		{
+			tool: &sdkmcp.Tool{
+				Name:        "bazel_run",
+				Description: "Run `bazel run` for a single target. Builds the target if needed, then executes it. Supports binaries, sh_binary, and other runnable targets including prebuilt binaries wrapped in runnable rules.",
+				InputSchema: objectSchema(
+					map[string]any{
+						"target":          stringProperty("The Bazel target to run (e.g. //path:binary)."),
+						"args":            stringArrayProperty("Arguments passed to the runnable after `--`. Omitted if empty."),
+						"flags":           stringArrayProperty("Additional flags passed after `bazel run` and before `--`."),
+						"timeout_seconds": timeoutProperty(),
+					},
+					"target",
+				),
+			},
+			handle: s.handleBazelRun,
+		},
 	}
 
 	for _, tool := range tools {
@@ -250,6 +275,14 @@ func (s *Server) handleBazelTest(ctx context.Context, request *sdkmcp.CallToolRe
 		return nil, err
 	}
 	return s.runBazel(ctx, "test", args, timeout)
+}
+
+func (s *Server) handleBazelRun(ctx context.Context, request *sdkmcp.CallToolRequest) (*sdkmcp.CallToolResult, error) {
+	args, timeout, err := s.parseRunArguments(request.Params.Arguments)
+	if err != nil {
+		return nil, err
+	}
+	return s.runBazel(ctx, "run", args, timeout)
 }
 
 func (s *Server) parseInfoArguments(raw json.RawMessage) ([]string, time.Duration, error) {
@@ -332,6 +365,43 @@ func (s *Server) parseTargetArguments(raw json.RawMessage) ([]string, time.Durat
 
 	args := append([]string{}, flags...)
 	args = append(args, targets...)
+	return args, timeout, nil
+}
+
+func (s *Server) parseRunArguments(raw json.RawMessage) ([]string, time.Duration, error) {
+	fields, err := parseArgumentObject(raw)
+	if err != nil {
+		return nil, 0, invalidParams(err.Error())
+	}
+
+	target, ok, err := consumeString(fields, "target")
+	if err != nil {
+		return nil, 0, invalidParams(err.Error())
+	}
+	if !ok || strings.TrimSpace(target) == "" {
+		return nil, 0, invalidParams("target is required")
+	}
+
+	runArgs, _, err := consumeStringSlice(fields, "args")
+	if err != nil {
+		return nil, 0, invalidParams(err.Error())
+	}
+
+	flags, timeout, err := s.consumeFlagsAndTimeout(fields)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if err := ensureNoUnknownFields(fields); err != nil {
+		return nil, 0, invalidParams(err.Error())
+	}
+
+	args := append([]string{}, flags...)
+	args = append(args, target)
+	if len(runArgs) > 0 {
+		args = append(args, "--")
+		args = append(args, runArgs...)
+	}
 	return args, timeout, nil
 }
 

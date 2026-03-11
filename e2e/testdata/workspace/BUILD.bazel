@@ -1,9 +1,15 @@
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//:simple_test.bzl", "simple_test")
 
 genrule(
     name = "hello",
     outs = ["hello.txt"],
     cmd = "echo hello-from-bazel > $@",
+)
+
+sh_binary(
+    name = "run_me",
+    srcs = ["run_me.sh"],
 )
 
 simple_test(

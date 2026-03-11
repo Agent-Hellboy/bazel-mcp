@@ -1,5 +1,6 @@
 //go:build e2e
 
+// Package e2e_test provides end-to-end tests for the bazel-mcp server against a real Bazel workspace.
 package e2e_test
 
 import (
@@ -18,6 +19,8 @@ import (
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// TestServerEndToEnd exercises the MCP server against a real Bazel workspace, verifying
+// bazel_info, bazel_build, bazel_test, and bazel_run tools.
 func TestServerEndToEnd(t *testing.T) {
 	if _, err := exec.LookPath("bazel"); err != nil {
 		t.Skipf("bazel is required for the e2e test: %v", err)
@@ -84,6 +87,7 @@ func TestServerEndToEnd(t *testing.T) {
 		"bazel_aquery",
 		"bazel_build",
 		"bazel_test",
+		"bazel_run",
 	} {
 		if !slices.Contains(toolNames, required) {
 			t.Fatalf("tools/list missing %q: %v", required, toolNames)
@@ -122,6 +126,29 @@ func TestServerEndToEnd(t *testing.T) {
 		t.Fatalf("bazel_test failed: %v\nstderr:\n%s", err, stderr.String())
 	}
 	assertToolResult(t, testResult, "PASSED", "Exit code: 0", false)
+
+	runResult, err := session.CallTool(ctx, &sdkmcp.CallToolParams{
+		Name: "bazel_run",
+		Arguments: map[string]any{
+			"target": "//:run_me",
+		},
+	})
+	if err != nil {
+		t.Fatalf("bazel_run failed: %v\nstderr:\n%s", err, stderr.String())
+	}
+	assertToolResult(t, runResult, "run-target-output", "Exit code: 0", false)
+
+	runWithArgsResult, err := session.CallTool(ctx, &sdkmcp.CallToolParams{
+		Name: "bazel_run",
+		Arguments: map[string]any{
+			"target": "//:run_me",
+			"args":  []string{"--foo", "bar"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("bazel_run with args failed: %v\nstderr:\n%s", err, stderr.String())
+	}
+	assertToolResult(t, runWithArgsResult, "args: --foo bar", "Exit code: 0", false)
 }
 
 func repositoryRoot(t *testing.T) string {
@@ -184,6 +211,14 @@ func copyDir(t *testing.T, source string, destination string) {
 	if err := filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+
+		base := filepath.Base(path)
+		if strings.HasPrefix(base, "bazel-") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		relativePath, err := filepath.Rel(source, path)

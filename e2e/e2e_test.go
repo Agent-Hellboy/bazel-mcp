@@ -84,6 +84,7 @@ func TestServerEndToEnd(t *testing.T) {
 		"bazel_aquery",
 		"bazel_build",
 		"bazel_test",
+		"bazel_run",
 	} {
 		if !slices.Contains(toolNames, required) {
 			t.Fatalf("tools/list missing %q: %v", required, toolNames)
@@ -122,6 +123,17 @@ func TestServerEndToEnd(t *testing.T) {
 		t.Fatalf("bazel_test failed: %v\nstderr:\n%s", err, stderr.String())
 	}
 	assertToolResult(t, testResult, "PASSED", "Exit code: 0", false)
+
+	runResult, err := session.CallTool(ctx, &sdkmcp.CallToolParams{
+		Name: "bazel_run",
+		Arguments: map[string]any{
+			"target": "//:run_me",
+		},
+	})
+	if err != nil {
+		t.Fatalf("bazel_run failed: %v\nstderr:\n%s", err, stderr.String())
+	}
+	assertToolResult(t, runResult, "run-target-output", "Exit code: 0", false)
 }
 
 func repositoryRoot(t *testing.T) string {

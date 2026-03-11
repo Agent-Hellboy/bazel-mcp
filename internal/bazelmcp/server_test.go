@@ -63,6 +63,7 @@ func TestInitializeAndToolsList(t *testing.T) {
 		"bazel_cquery",
 		"bazel_info",
 		"bazel_query",
+		"bazel_run",
 		"bazel_test",
 	}
 
@@ -115,6 +116,43 @@ func TestBazelBuildCallsRunnerWithTargetsAndFlags(t *testing.T) {
 	}
 	if !strings.Contains(joinToolContent(result), "Exit code: 0") {
 		t.Fatalf("expected exit code in response text, got %q", joinToolContent(result))
+	}
+}
+
+func TestBazelRunCallsRunnerWithTargetAndArgs(t *testing.T) {
+	runner := &fakeRunner{
+		result: CommandResult{
+			Stdout:   "run-target-output",
+			ExitCode: 0,
+		},
+	}
+	server := newTestServer(runner)
+	session := newTestClientSession(t, server)
+
+	result, err := session.CallTool(context.Background(), &sdkmcp.CallToolParams{
+		Name: "bazel_run",
+		Arguments: map[string]any{
+			"target": "//cmd/server:server",
+			"args":   []string{"--port", "8080"},
+			"flags":  []string{"--config=release"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool returned error: %v", err)
+	}
+
+	if len(runner.calls) != 1 {
+		t.Fatalf("expected one runner call, got %d", len(runner.calls))
+	}
+
+	gotArgs := strings.Join(runner.calls[0].Args, " ")
+	wantArgs := "run --config=release //cmd/server:server -- --port 8080"
+	if gotArgs != wantArgs {
+		t.Fatalf("unexpected bazel args: got %q want %q", gotArgs, wantArgs)
+	}
+
+	if result.IsError {
+		t.Fatal("expected successful run result")
 	}
 }
 

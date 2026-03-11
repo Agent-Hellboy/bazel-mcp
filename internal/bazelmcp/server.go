@@ -197,6 +197,22 @@ func (s *Server) registerTools() {
 			},
 			handle: s.handleBazelTest,
 		},
+		{
+			tool: &sdkmcp.Tool{
+				Name:        "bazel_run",
+				Description: "Run `bazel run` for a single target. Builds the target if needed, then executes it. Supports binaries, sh_binary, and other runnable targets including prebuilt binaries wrapped in runnable rules.",
+				InputSchema: objectSchema(
+					map[string]any{
+						"target":          stringProperty("The Bazel target to run (e.g. //path:binary)."),
+						"args":            stringArrayProperty("Arguments passed to the runnable after `--`. Omitted if empty."),
+						"flags":           stringArrayProperty("Additional flags passed after `bazel run` and before `--`."),
+						"timeout_seconds": timeoutProperty(),
+					},
+					"target",
+				),
+			},
+			handle: s.handleBazelRun,
+		},
 	}
 
 	for _, tool := range tools {
@@ -250,6 +266,14 @@ func (s *Server) handleBazelTest(ctx context.Context, request *sdkmcp.CallToolRe
 		return nil, err
 	}
 	return s.runBazel(ctx, "test", args, timeout)
+}
+
+func (s *Server) handleBazelRun(ctx context.Context, request *sdkmcp.CallToolRequest) (*sdkmcp.CallToolResult, error) {
+	args, timeout, err := s.parseRunArguments(request.Params.Arguments)
+	if err != nil {
+		return nil, err
+	}
+	return s.runBazel(ctx, "run", args, timeout)
 }
 
 func (s *Server) parseInfoArguments(raw json.RawMessage) ([]string, time.Duration, error) {
@@ -332,6 +356,43 @@ func (s *Server) parseTargetArguments(raw json.RawMessage) ([]string, time.Durat
 
 	args := append([]string{}, flags...)
 	args = append(args, targets...)
+	return args, timeout, nil
+}
+
+func (s *Server) parseRunArguments(raw json.RawMessage) ([]string, time.Duration, error) {
+	fields, err := parseArgumentObject(raw)
+	if err != nil {
+		return nil, 0, invalidParams(err.Error())
+	}
+
+	target, ok, err := consumeString(fields, "target")
+	if err != nil {
+		return nil, 0, invalidParams(err.Error())
+	}
+	if !ok || strings.TrimSpace(target) == "" {
+		return nil, 0, invalidParams("target is required")
+	}
+
+	runArgs, _, err := consumeStringSlice(fields, "args")
+	if err != nil {
+		return nil, 0, invalidParams(err.Error())
+	}
+
+	flags, timeout, err := s.consumeFlagsAndTimeout(fields)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if err := ensureNoUnknownFields(fields); err != nil {
+		return nil, 0, err
+	}
+
+	args := append([]string{}, flags...)
+	args = append(args, target)
+	if len(runArgs) > 0 {
+		args = append(args, "--")
+		args = append(args, runArgs...)
+	}
 	return args, timeout, nil
 }
 

@@ -10,6 +10,7 @@
 - `bazel_aquery`: inspect generated build actions
 - `bazel_build`: build one or more targets
 - `bazel_test`: test one or more targets
+- `bazel_run`: run a single target (builds if needed, then executes; supports binaries, sh_binary, and prebuilt binaries wrapped in runnable rules)
 
 All tools run inside a configured Bazel workspace and return structured text that includes the executed command, workspace, duration, exit code, and any captured stdout or stderr.
 

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "bazel-mcp": {
+      "type": "stdio",
+      "command": "sh",
+      "args": [
+        "-c",
+        "cd /path/to/bazel-mcp && go run /path/to/bazel-mcp/cmd/bazel-mcp --workspace /path/to/your/bazel/workspace"
+      ]
+    }
+  }
+}

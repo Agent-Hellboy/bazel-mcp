@@ -42,19 +42,69 @@ Environment variables mirror the main scalar flags:
 - `BAZEL_MCP_TIMEOUT_SECONDS`
 - `BAZEL_MCP_MAX_OUTPUT_BYTES`
 
-**Example MCP Client Command**
+**MCP client setup**
+
+Add `bazel-mcp` to your MCP client configuration. An example config is in `mcp.json.example`; copy and adjust paths.
+
+Config file locations:
+- **Cursor**: `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project)
+- **Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
+- **Continue / Windsurf**: see each client’s MCP setup docs
+
+**Cursor** (`~/.cursor/mcp.json` or `.cursor/mcp.json` in your project):
+
+Use full absolute paths for reliability (some clients mis-resolve `./cmd/bazel-mcp`):
 
 ```json
 {
-  "command": "go",
-  "args": [
-    "run",
-    "./cmd/bazel-mcp",
-    "--workspace",
-    "/path/to/workspace"
-  ]
+  "mcpServers": {
+    "bazel-mcp": {
+      "type": "stdio",
+      "command": "sh",
+      "args": [
+        "-c",
+        "cd /path/to/bazel-mcp && go run /path/to/bazel-mcp/cmd/bazel-mcp --workspace /path/to/your/bazel/workspace"
+      ]
+    }
+  }
 }
 ```
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "bazel-mcp": {
+      "type": "stdio",
+      "command": "sh",
+      "args": [
+        "-c",
+        "cd /path/to/bazel-mcp && go run /path/to/bazel-mcp/cmd/bazel-mcp --workspace /path/to/your/bazel/workspace"
+      ]
+    }
+  }
+}
+```
+
+**Using a built binary** (avoids `go run` on each start):
+
+```bash
+go build -o ~/bin/bazel-mcp ./cmd/bazel-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "bazel-mcp": {
+      "command": "/Users/you/bin/bazel-mcp",
+      "args": ["--workspace", "/path/to/workspace"]
+    }
+  }
+}
+```
+
+Restart the client after changing the config.
 
 **Development**
 

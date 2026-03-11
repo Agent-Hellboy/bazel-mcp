@@ -153,6 +153,15 @@ func buildServerBinary(t *testing.T, repoRoot string, binaryPath string, tempRoo
 		goPath = filepath.Join(cacheRoot, "gopath")
 	}
 
+	goFlags := strings.TrimSpace(os.Getenv("GOFLAGS"))
+	if !strings.Contains(goFlags, "-modcacherw") {
+		if goFlags == "" {
+			goFlags = "-modcacherw"
+		} else {
+			goFlags += " -modcacherw"
+		}
+	}
+
 	command := exec.Command("go", "build", "-o", binaryPath, "./cmd/bazel-mcp")
 	command.Dir = repoRoot
 	command.Env = append(
@@ -160,6 +169,7 @@ func buildServerBinary(t *testing.T, repoRoot string, binaryPath string, tempRoo
 		"GOCACHE="+filepath.Join(cacheRoot, "build"),
 		"GOMODCACHE="+modCache,
 		"GOPATH="+goPath,
+		"GOFLAGS="+goFlags,
 	)
 
 	output, err := command.CombinedOutput()

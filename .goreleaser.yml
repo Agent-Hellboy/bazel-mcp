@@ -1,0 +1,27 @@
+version: 2
+
+project_name: bazel-mcp
+
+builds:
+  - id: bazel-mcp
+    main: ./cmd/bazel-mcp
+    binary: bazel-mcp
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "bazel-mcp_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+
+checksum:
+  name_template: "checksums.txt"

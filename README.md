@@ -1,6 +1,26 @@
 # bazel-mcp
 
-`bazel-mcp` is a small Model Context Protocol server that exposes common Bazel workflows over stdio. It is implemented in Go on top of the official MCP Go SDK, so it can be built and run with the local Go toolchain alone.
+`bazel-mcp` is a small Model Context Protocol server that exposes common Bazel workflows over stdio. It is implemented in Go on top of the official MCP Go SDK.
+
+**Installation**
+
+Download a pre-built binary from [Releases](https://github.com/Agent-Hellboy/bazel-mcp/releases) (or build from source below).
+
+| Platform   | Download |
+|-----------|----------|
+| macOS ARM64 | `bazel-mcp_darwin_arm64.tar.gz` |
+| macOS x86_64 | `bazel-mcp_darwin_amd64.tar.gz` |
+| Linux x86_64 | `bazel-mcp_linux_amd64.tar.gz` |
+| Linux ARM64 | `bazel-mcp_linux_arm64.tar.gz` |
+| Windows x86_64 | `bazel-mcp_windows_amd64.zip` |
+
+```bash
+# Example: macOS ARM64
+curl -sL https://github.com/Agent-Hellboy/bazel-mcp/releases/latest/download/bazel-mcp_darwin_arm64.tar.gz | tar xz -C /usr/local/bin
+chmod +x /usr/local/bin/bazel-mcp
+```
+
+Or place the binary anywhere and use its full path in your MCP config.
 
 **Tools**
 
@@ -14,16 +34,17 @@
 
 All tools run inside a configured Bazel workspace and return structured text that includes the executed command, workspace, duration, exit code, and any captured stdout or stderr.
 
-**Build**
+**Build from source** (optional; binaries are available from [Releases](https://github.com/Agent-Hellboy/bazel-mcp/releases))
 
 ```bash
-go build ./cmd/bazel-mcp
+go build -o bazel-mcp ./cmd/bazel-mcp
 ```
 
 **Run**
 
 ```bash
-go run ./cmd/bazel-mcp --workspace /path/to/workspace
+bazel-mcp --workspace /path/to/workspace
+# or: go run ./cmd/bazel-mcp --workspace /path/to/workspace
 ```
 
 Useful flags:
@@ -44,16 +65,27 @@ Environment variables mirror the main scalar flags:
 
 **MCP client setup**
 
-Add `bazel-mcp` to your MCP client configuration. An example config is in `mcp.json.example`; copy and adjust paths.
+**Cursor**
 
-Config file locations:
-- **Cursor**: `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project)
-- **Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
-- **Continue / Windsurf**: see each client’s MCP setup docs
+Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project).
 
-**Cursor** (`~/.cursor/mcp.json` or `.cursor/mcp.json` in your project):
+Using downloaded binary:
 
-Use full absolute paths for reliability (some clients mis-resolve `./cmd/bazel-mcp`):
+```json
+{
+  "mcpServers": {
+    "bazel-mcp": {
+      "type": "stdio",
+      "command": "/usr/local/bin/bazel-mcp",
+      "args": ["--workspace", "/path/to/your/bazel/workspace"]
+    }
+  }
+}
+```
+
+Use the full path to wherever you installed the binary.
+
+Using source (requires Go):
 
 ```json
 {
@@ -70,41 +102,11 @@ Use full absolute paths for reliability (some clients mis-resolve `./cmd/bazel-m
 }
 ```
 
-**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+Use full absolute paths; some clients mis-resolve `./cmd/bazel-mcp`.
 
-```json
-{
-  "mcpServers": {
-    "bazel-mcp": {
-      "type": "stdio",
-      "command": "sh",
-      "args": [
-        "-c",
-        "cd /path/to/bazel-mcp && go run /path/to/bazel-mcp/cmd/bazel-mcp --workspace /path/to/your/bazel/workspace"
-      ]
-    }
-  }
-}
-```
+Restart Cursor after changing the config.
 
-**Using a built binary** (avoids `go run` on each start):
-
-```bash
-go build -o ~/bin/bazel-mcp ./cmd/bazel-mcp
-```
-
-```json
-{
-  "mcpServers": {
-    "bazel-mcp": {
-      "command": "/Users/you/bin/bazel-mcp",
-      "args": ["--workspace", "/path/to/workspace"]
-    }
-  }
-}
-```
-
-Restart the client after changing the config.
+**Other MCP clients** (Claude Desktop, Continue, Windsurf, etc.): Use the same stdio config format. Refer to your client's docs for config file location and structure.
 
 **Development**
 
